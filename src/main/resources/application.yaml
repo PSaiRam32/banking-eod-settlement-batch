@@ -1,0 +1,65 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: banking-eod-settlement-batch
+  datasource:
+    url: jdbc:mysql://localhost:3306/bankdb
+    username: root
+    password: 2000030757
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  sql:
+    init:
+      mode: always
+  batch:
+    jdbc:
+      initialize-schema: never
+      table-prefix: BATCH_
+      incrementer-type: mysql
+      job:
+        enabled: false
+    input:
+      path: file:D:/Spring Batch/data/bank/input/*.csv
+    archive:
+      path: D:/Spring Batch/data/bank/archive
+
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: sairam.paidipati32@gmail.com
+    password: oplj qscp xdst nwmk
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+
+account:
+  service:
+    base-url: http://localhost:8081/api/accounts
+
+resilience4j:
+  retry:
+    instances:
+      account-service:
+        max-attempts: 3
+        wait-duration: 2s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+          - batch
