@@ -61,6 +61,14 @@ public class BatchMetricsListener extends JobExecutionListenerSupport {
         System.out.println("READ      : " + totalRead);
         System.out.println("WRITTEN   : " + totalWrite);
         System.out.println("SKIPPED   : " + totalSkip);
+
+        // Log batch failure status
+        if (jobExecution.getStatus().isUnsuccessful()) {
+            System.out.println("BATCH FAILED");
+            System.out.println("Input files remain in: " + jobExecution.getExecutionContext());
+            System.out.println("Please review the batch failure and retry.");
+        }
+
         System.out.println("=================================");
 
         // ----------------- EMAIL -----------------
@@ -84,7 +92,7 @@ public class BatchMetricsListener extends JobExecutionListenerSupport {
 
         SimpleMailMessage mail = new SimpleMailMessage();
         mail.setTo("rmavayya1@gmail.com");
-        mail.setSubject("EOD Batch Execution Status");
+        mail.setSubject("EOD Settlement Batch Job Status"+(jobExecution.getStatus().isUnsuccessful() ? " - FAILED" : " - SUCCESS"));
         mail.setText(mailBody);
 
         try {
