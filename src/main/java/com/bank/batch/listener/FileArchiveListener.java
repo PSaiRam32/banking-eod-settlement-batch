@@ -1,14 +1,12 @@
 package com.bank.batch.listener;
 
-import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobExecutionListener;
-import org.springframework.batch.core.BatchStatus;
-import org.springframework.batch.core.ExitStatus;
+import org.springframework.batch.core.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
 import java.nio.file.*;
+import java.util.Objects;
 
 @Component
 public class FileArchiveListener implements JobExecutionListener {
@@ -25,7 +23,7 @@ public class FileArchiveListener implements JobExecutionListener {
         try {
             Resource[] resources = new PathMatchingResourcePatternResolver().getResources(inputPath);
 
-            if (resources == null || resources.length == 0) {
+            if (resources.length == 0) {
                 String msg = "No input files found at path: " + inputPath + " - failing the job before processing.";
                 System.out.println("========================================");
                 System.out.println(msg);
@@ -52,7 +50,7 @@ public class FileArchiveListener implements JobExecutionListener {
 
     private long getTotalSkippedRecords(JobExecution jobExecution) {
         return jobExecution.getStepExecutions().stream()
-                .mapToLong(step -> step.getSkipCount())
+                .mapToLong(StepExecution::getSkipCount)
                 .sum();
     }
 
@@ -106,7 +104,7 @@ public class FileArchiveListener implements JobExecutionListener {
             for (Resource r : resources) {
 
                 Path source = r.getFile().toPath();
-                Path target = archiveDir.resolve(r.getFilename());
+                Path target = archiveDir.resolve(Objects.requireNonNull(r.getFilename()));
 
                 Files.move(
                         source,
