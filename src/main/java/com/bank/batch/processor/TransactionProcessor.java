@@ -66,7 +66,9 @@ public class TransactionProcessor
             ledger.setBalanceAfter(balance.add(input.getAmount()));
         }
 
-        return new BatchWriteBundle(input, ledger);
+        BatchWriteBundle bundle = new BatchWriteBundle(input, ledger);
+        bundle.setSourceFile(input.getSourceFile());
+
+        return bundle;
     }
 }
-

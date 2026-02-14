@@ -9,6 +9,7 @@ import org.springframework.context.annotation.*;
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -46,8 +47,7 @@ public class MultiFileReader {
     @Bean
     public FlatFileItemReader<TransactionInput> transactionReader() {
 
-        FlatFileItemReader<TransactionInput> reader =
-                new FlatFileItemReader<>();
+        FileAwareFlatFileItemReader reader = new FileAwareFlatFileItemReader();
 
         reader.setLinesToSkip(1);
 
@@ -62,9 +62,9 @@ public class MultiFileReader {
                 "txnDate"
         );
 
-        BeanWrapperFieldSetMapper<TransactionInput> mapper =
+        BeanWrapperFieldSetMapper<TransactionInput> delegateMapper =
                 new BeanWrapperFieldSetMapper<>();
-        mapper.setTargetType(TransactionInput.class);
+        delegateMapper.setTargetType(TransactionInput.class);
 
         DefaultConversionService conversionService =
                 new DefaultConversionService();
@@ -75,16 +75,60 @@ public class MultiFileReader {
         conversionService.addConverter(String.class, LocalDate.class,
                 source -> LocalDate.parse(source, formatter));
 
-        mapper.setConversionService(conversionService);
+        delegateMapper.setConversionService(conversionService);
 
         DefaultLineMapper<TransactionInput> lineMapper =
                 new DefaultLineMapper<>();
         lineMapper.setLineTokenizer(tokenizer);
-        lineMapper.setFieldSetMapper(mapper);
+
+        // Capture the reader instance in the mapper so we can read current file reliably
+        lineMapper.setFieldSetMapper(fieldSet -> {
+            TransactionInput t = delegateMapper.mapFieldSet(fieldSet);
+            String file = reader.getCurrentFile();
+            if (t != null) {
+                t.setSourceFile(file);
+            }
+            return t;
+        });
 
         reader.setLineMapper(lineMapper);
 
         return reader;
+    }
+
+    // Small subclass of FlatFileItemReader that captures the resource file name
+    private static class FileAwareFlatFileItemReader extends FlatFileItemReader<TransactionInput> {
+
+        private volatile String currentFile;
+
+        @Override
+        public void setResource(Resource resource) {
+            super.setResource(resource);
+            if (resource != null && resource.getFilename() != null) {
+                this.currentFile = resource.getFilename();
+            } else {
+                this.currentFile = null;
+            }
+        }
+
+        public String getCurrentFile() {
+            return currentFile;
+        }
+
+        @Override
+        public TransactionInput read() throws Exception {
+            TransactionInput item = super.read();
+            if (item != null && item.getSourceFile() == null) {
+                item.setSourceFile(this.currentFile);
+            }
+            return item;
+        }
+
+        @Override
+        public void close() {
+            super.close();
+            this.currentFile = null;
+        }
     }
 
 }

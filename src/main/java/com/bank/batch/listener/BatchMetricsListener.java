@@ -1,5 +1,6 @@
 package com.bank.batch.listener;
 
+import com.bank.batch.entity.FailedTransaction;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.StepExecution;
@@ -8,52 +9,35 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 public class BatchMetricsListener extends JobExecutionListenerSupport {
 
     private final MeterRegistry meterRegistry;
     private final JavaMailSender mailSender;
+    private final FailedTransactionHolder failedTransactionHolder;
 
     public BatchMetricsListener(MeterRegistry meterRegistry,
-                                JavaMailSender mailSender) {
+                                JavaMailSender mailSender,
+                                FailedTransactionHolder failedTransactionHolder) {
         this.meterRegistry = meterRegistry;
         this.mailSender = mailSender;
+        this.failedTransactionHolder = failedTransactionHolder;
     }
 
     @Override
     public void afterJob(JobExecution jobExecution) {
 
-        long totalRead = 0;
-        long totalWrite = 0;
-        long totalSkip = 0;
+        int totalRead = 0;
+        int totalWrite = 0;
+        int totalSkip = 0;
 
-        for (StepExecution step : jobExecution.getStepExecutions()) {
-
-            // ----------------- MICROMETER METRICS -----------------
-
-            meterRegistry.counter(
-                    "batch.records.read",
-                    "step", step.getStepName()
-            ).increment(step.getReadCount());
-
-            meterRegistry.counter(
-                    "batch.records.written",
-                    "step", step.getStepName()
-            ).increment(step.getWriteCount());
-
-            meterRegistry.counter(
-                    "batch.records.skipped",
-                    "step", step.getStepName()
-            ).increment(step.getSkipCount());
-
-            // ----------------- TOTAL COUNTS -----------------
-
-            totalRead += step.getReadCount();
-            totalWrite += step.getWriteCount();
-            totalSkip += step.getSkipCount();
+        for (StepExecution se : jobExecution.getStepExecutions()) {
+            totalRead += se.getReadCount();
+            totalWrite += se.getWriteCount();
+            totalSkip += se.getSkipCount();
         }
-
-        // ----------------- CONSOLE OUTPUT -----------------
 
         System.out.println("=================================");
         System.out.println("JOB NAME  : " + jobExecution.getJobInstance().getJobName());
@@ -73,27 +57,29 @@ public class BatchMetricsListener extends JobExecutionListenerSupport {
 
         // ----------------- EMAIL -----------------
 
-        String mailBody = """
-                Banking EOD Batch Job Completed
+        StringBuilder mailBody = new StringBuilder();
+        mailBody.append("Banking EOD Batch Job Completed\n\n");
+        mailBody.append(String.format("Job Name : %s\n", jobExecution.getJobInstance().getJobName()));
+        mailBody.append(String.format("Status   : %s\n\n", jobExecution.getStatus()));
+        mailBody.append(String.format("Records Read    : %d\n", totalRead));
+        mailBody.append(String.format("Records Written : %d\n", totalWrite));
+        mailBody.append(String.format("Records Skipped : %d\n\n", totalSkip));
 
-                Job Name : %s
-                Status   : %s
-
-                Records Read    : %d
-                Records Written : %d
-                Records Skipped : %d
-                """.formatted(
-                jobExecution.getJobInstance().getJobName(),
-                jobExecution.getStatus(),
-                totalRead,
-                totalWrite,
-                totalSkip
-        );
+        // Add failed transaction details if any
+        List<FailedTransaction> failures = failedTransactionHolder.getFailures();
+        if (failures != null && !failures.isEmpty()) {
+            mailBody.append("Failed Transactions:\n");
+            for (FailedTransaction f : failures) {
+                mailBody.append("File name: ").append(f.getFileName() == null ? "<unknown>" : f.getFileName()).append("\n");
+                mailBody.append("Failed Transaction ID: ").append(f.getTxnId() == null ? "<unknown>" : f.getTxnId()).append("\n");
+                mailBody.append("Failure reason: ").append(f.getReason() == null ? "<unknown>" : f.getReason()).append("\n\n");
+            }
+        }
 
         SimpleMailMessage mail = new SimpleMailMessage();
         mail.setTo("rmavayya1@gmail.com");
-        mail.setSubject("EOD Settlement Batch Job Status"+(jobExecution.getStatus().isUnsuccessful() ? " - FAILED" : " - SUCCESS"));
-        mail.setText(mailBody);
+        mail.setSubject("EOD Settlement Batch Job Status" + (jobExecution.getStatus().isUnsuccessful() ? " - FAILED" : " - SUCCESS"));
+        mail.setText(mailBody.toString());
 
         try {
             mailSender.send(mail);
@@ -101,6 +87,9 @@ public class BatchMetricsListener extends JobExecutionListenerSupport {
         } catch (Exception e) {
             System.out.println("Email failed: " + e.getMessage());
         }
+
+        // clear failures after sending summary
+        failedTransactionHolder.clear();
 
     }
 }

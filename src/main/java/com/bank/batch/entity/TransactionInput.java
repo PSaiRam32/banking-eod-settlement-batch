@@ -2,7 +2,6 @@ package com.bank.batch.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
-import org.springframework.cglib.core.Local;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.math.BigDecimal;
@@ -22,6 +21,9 @@ public class TransactionInput {
     @JsonFormat(pattern = "dd-MM-yyyy")
     private LocalDate txnDate;
 
+    // Transient field to hold source file name (not persisted)
+    @Transient
+    private String sourceFile;
 
     public String getTxnId() {
         return txnId;
@@ -61,6 +63,14 @@ public class TransactionInput {
 
     public void setTxnDate(LocalDate txnDate) {
         this.txnDate = txnDate;
+    }
+
+    public String getSourceFile() {
+        return sourceFile;
+    }
+
+    public void setSourceFile(String sourceFile) {
+        this.sourceFile = sourceFile;
     }
 
 
