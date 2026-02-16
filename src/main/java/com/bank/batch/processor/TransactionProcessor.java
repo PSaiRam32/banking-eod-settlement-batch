@@ -3,7 +3,10 @@ package com.bank.batch.processor;
 import com.bank.batch.client.AccountFeignClient;
 import com.bank.batch.entity.AccountLedger;
 import com.bank.batch.entity.TransactionInput;
+import com.bank.batch.exception.AccountServiceUnavailableException;
 import com.bank.batch.writer.BatchWriteBundle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +18,7 @@ public class TransactionProcessor
         implements ItemProcessor<TransactionInput, BatchWriteBundle> {
 
     private final AccountFeignClient client;
+    private static final Logger log = LoggerFactory.getLogger(TransactionProcessor.class);
 
     public TransactionProcessor(AccountFeignClient client) {
         this.client = client;
@@ -30,8 +34,9 @@ public class TransactionProcessor
         try {
             acc = client.getAccount(input.getAccountNo());
         } catch (Exception e) {
-            System.out.println("Account service failed for " + input.getAccountNo());
-            throw new RuntimeException("Account service unavailable");
+            log.error("Account service call failed for accountNumber={}", input.getAccountNo(), e);
+            throw new AccountServiceUnavailableException(
+                    "Account not found or account-service unavailable for accountNumber=" + input.getAccountNo(), e);
         }
 
         if (acc == null || acc.get("status") == null) {
