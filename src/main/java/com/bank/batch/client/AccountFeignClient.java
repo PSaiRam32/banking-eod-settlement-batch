@@ -1,5 +1,7 @@
 package com.bank.batch.client;
 
+import com.bank.batch.dto.ApiResponse;
+import com.bank.batch.entity.Account;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,5 +16,8 @@ import java.util.Map;
 public interface AccountFeignClient {
 
     @GetMapping("/{accountNumber}")
-    Map<String, Object> getAccount(@PathVariable String accountNumber);
+    ApiResponse<Account> getAccount(@PathVariable String accountNumber);
+
+
+
 }

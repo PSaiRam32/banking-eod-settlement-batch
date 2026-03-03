@@ -75,10 +75,22 @@ public class BatchMetricsListener extends JobExecutionListenerSupport {
                 mailBody.append("Failure reason: ").append(f.getReason() == null ? "<unknown>" : f.getReason()).append("\n\n");
             }
         }
+        mailBody.append("\n--------------------------------------------------\n");
+        mailBody.append("Regards,\n");
+        mailBody.append("Banking EOD Settlement Platform\n");
+        mailBody.append("Operations & Batch Processing Team\n\n");
+        mailBody.append("This is a system-generated email. Please do not reply.\n");
+        mailBody.append("For support, contact: settelement-support@srbank.com\n");
+        mailBody.append("--------------------------------------------------\n");
 
         SimpleMailMessage mail = new SimpleMailMessage();
         mail.setTo("rmavayya1@gmail.com");
-        mail.setSubject("EOD Settlement Batch Job Status" + (jobExecution.getStatus().isUnsuccessful() ? " - FAILED" : " - SUCCESS"));
+        String subject = String.format(
+                "[EOD-BATCH] %s | Status: %s",
+                jobExecution.getJobInstance().getJobName(),
+                jobExecution.getStatus()
+        );
+        mail.setSubject(subject);
         mail.setText(mailBody.toString());
 
         try {

@@ -1,6 +1,8 @@
 package com.bank.batch.processor;
 
 import com.bank.batch.client.AccountFeignClient;
+import com.bank.batch.dto.ApiResponse;
+import com.bank.batch.entity.Account;
 import com.bank.batch.entity.AccountLedger;
 import com.bank.batch.entity.TransactionInput;
 import com.bank.batch.exception.AccountServiceUnavailableException;
@@ -29,7 +31,7 @@ public class TransactionProcessor
 
         System.out.println("Processing TXN -> " + input.getTxnId());
 
-        Map<String, Object> acc;
+        ApiResponse<Account> acc;
 
         try {
             acc = client.getAccount(input.getAccountNo());
@@ -39,16 +41,17 @@ public class TransactionProcessor
                     "Account not found or account-service unavailable for accountNumber=" + input.getAccountNo(), e);
         }
 
-        if (acc == null || acc.get("status") == null) {
-            throw new RuntimeException("Invalid account response");
+        if (acc == null || !acc.isSuccess() || acc.getData() == null) {
+            throw new RuntimeException("Account not found: " + input.getAccountNo());
         }
 
-        if (!"ACTIVE".equalsIgnoreCase(acc.get("status").toString())) {
+        Account account = acc.getData();
+
+        if (!"ACTIVE".equalsIgnoreCase(account.getStatus())) {
             throw new RuntimeException("Inactive account");
         }
 
-        BigDecimal balance =
-                new BigDecimal(acc.get("balance").toString());
+        BigDecimal balance = account.getBalance();
 
         AccountLedger ledger = new AccountLedger();
         ledger.setTxnId(input.getTxnId());
